@@ -502,6 +502,7 @@ if (orderForm) {
 
     waistOrderSubmitting = true;
     if (submitButton) {
+      submitButton.dataset.originalOrderLabel = originalButtonText;
       submitButton.disabled = true;
       submitButton.textContent = 'SENDING ORDER...';
     }
@@ -509,16 +510,16 @@ if (orderForm) {
     document.body.style.overflow = 'hidden';
 
     try {
-      // Apps Script Web App endpoint; text/plain + no-cors avoids preflight.
-      // Apps Script receives this JSON in e.postData.contents.
-      await fetch("https://script.google.com/macros/s/AKfycbyV2wBxIn-T34Rk3G-KNPs_POWGbAKhEjME-FE_SZFBuQe8mCrgIZpNyrfc2xxnkiS_NA/exec", {
+      // Send the order to Google Sheets in the background.
+      // Do not wait for the network response before moving to Thank You.
+      fetch("https://script.google.com/macros/s/AKfycbyV2wBxIn-T34Rk3G-KNPs_POWGbAKhEjME-FE_SZFBuQe8mCrgIZpNyrfc2xxnkiS_NA/exec", {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload)
-      });
+      }).catch(error => console.error("Order submission error:", error));
 
-      // Keep the processing screen visible for 2 seconds before showing Thank You.
+      // Show Processing for exactly 2 seconds, then continue to Thank You.
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       const nameEl = document.getElementById('thankYouName');
@@ -579,7 +580,22 @@ if (backHome) {
     if (footer) footer.style.display = '';
     const thankYou = document.getElementById('thankYouPage');
     if (thankYou) thankYou.style.display = 'none';
-    if (orderForm) orderForm.reset();
+    if (orderForm) {
+      orderForm.reset();
+      // Restore the order button and all form fields for a fresh order.
+      const orderButton = orderForm.querySelector('button[type="submit"]');
+      if (orderButton) {
+        orderButton.disabled = false;
+        if (orderButton.dataset.originalOrderLabel) {
+          orderButton.textContent = orderButton.dataset.originalOrderLabel;
+        }
+      }
+      const successMessage = document.getElementById('success');
+      if (successMessage) {
+        successMessage.style.display = 'none';
+        successMessage.textContent = '';
+      }
+    }
     waistOrderSubmitting = false;
     updateOrderTotals();
     history.pushState({}, '', window.__waistShaperOriginalPath || '/');
